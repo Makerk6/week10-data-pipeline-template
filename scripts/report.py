@@ -1,23 +1,48 @@
 import pandas as pd
 import os
+import logging
+import sys
 
-# Ensure output directory exists
-os.makedirs("output", exist_ok=True)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.info("Start of execution")
 
-print("Loading data...")
-df = pd.read_parquet("data/sample_data.parquet")
+try:
+    # Ensure output directory exists
+    os.makedirs("output", exist_ok=True)
 
-print("Processing data...")
-df["revenue"] = df["price"] * df["qty"]
+    logging.info("Loading data...")
+    try:
+        df = pd.read_parquet("data/sample_data.parquet")
+    except FileNotFoundError:
+        logging.exception("Missing file error: data/sample_data.parquet was not found")
+        sys.exit(1)
+    except Exception:
+        logging.exception("Data loading failure: unable to read data/sample_data.parquet")
+        sys.exit(1)
 
-# Compute summary
-summary = df.groupby("category").agg(
-    total_revenue=("revenue", "sum"),
-    total_quantity=("qty", "sum"),
-    avg_price=("price", "mean")
-).reset_index()
+    logging.info("Processing data...")
+    df["revenue"] = df["price"] * df["qty"]
 
-print("Saving report...")
-summary.to_csv("output/report.csv", index=False)
+    # Compute summary
+    summary = df.groupby("category").agg(
+        total_revenue=("revenue", "sum"),
+        total_quantity=("qty", "sum"),
+        avg_price=("price", "mean"),
+        transaction_count=("category", "size")
+    ).reset_index()
 
-print("✅ Report generated at output/report.csv")
+    summary = summary[[
+        "category",
+        "total_revenue",
+        "total_quantity",
+        "avg_price",
+        "transaction_count",
+    ]]
+
+    logging.info("Report generation step")
+    summary.to_csv("output/report.csv", index=False)
+
+    logging.info("Completion message: report generated at output/report.csv")
+except Exception:
+    logging.exception("Unexpected runtime error while generating the report")
+    sys.exit(1)
